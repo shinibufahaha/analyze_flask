@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Path Visualization</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+    
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-popper@2.0.0/cytoscape-popper.min.js"></script>
+
+    <style>
+        body { font-family: sans-serif; margin: 0; padding: 20px; background: #f4f4f4; }
+        
+        /* 图表容器 */
+        #cy {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        {{ css_style | safe }}
+
+/* 2. 强制覆盖 Pygments 默认的背景色为深黑色 */
+.code-highlight {
+    background-color: #1e1e1e !important; /* VS Code 风格的深黑 */
+    color: #f8f8f2;
+}
+.code-highlight pre {
+    background-color: transparent !important; /* 让 pre 继承容器背景 */
+    margin: 0;
+    padding: 10px;
+}
+
+/* 3. 修改高亮行的颜色 (在黑色背景下使用深灰色或深蓝色) */
+.code-highlight .hll {
+    background-color: #3e3e3e !important; /* 深灰色高亮 */
+    display: block;
+    width: 100%;
+}
+
+.tippy-box {
+    background-color: #1e1e1e !important;
+    border: 1px solid #444;
+    border-radius: 6px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    max-width: 800px !important; /* 增加最大宽度限制，默认通常很小 */
+}
+
+.code-container {
+    background: #1e1e1e;
+    overflow-x: auto;
+    border-radius: 4px;
+    /* --- 新增或修改的参数 --- */
+    min-width: 400px;  /* 设置最小宽度 */
+    max-height: 500px; /* 设置最大高度，超过则滚动 */
+    font-size: 14px;   /* 调整字体大小，让代码更易读 */
+    line-height: 1.5;  /* 增加行高 */
+}
+    </style>
+</head>
+<body>
+
+    <h2>Source to Sink Path Visualization</h2>
+    <p>Hover over a node to see the highlighted source code.</p>
+    
+    <div id="cy"></div>
+
+    <script>
+        // 注册插件
+        cytoscape.use(cytoscapePopper);
+
+        // 接收 Flask 传来的数据
+        const nodesData = {{ nodes | tojson }};
+        const edgesData = {{ edges | tojson }};
+
+        var cy = cytoscape({
+            container: document.getElementById('cy'),
+            
+            elements: {
+                nodes: nodesData,
+                edges: edgesData
+            },
+
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': '#007bff',
+                        'label': 'data(label)',
+                        'color': '#333',
+                        'font-weight': 'bold',
+                        'text-valign': 'top',
+                        'text-margin-y': -10,
+                        'width': 40,
+                        'height': 40
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 3,
+                        'line-color': '#ccc',
+                        'target-arrow-color': '#ccc',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier'
+                    }
+                }
+            ],
+
+            layout: {
+                name: 'breadthfirst', // 树状/层级布局
+                directed: true,
+                padding: 10
+            }
+        });
+
+        // 管理 Tippy 实例
+        let tip = null;
+
+        // 鼠标悬停事件
+        cy.on('mouseover', 'node', function(event) {
+            let node = event.target;
+            let codeHtml = node.data('code_html');
+
+            // 创建 Popper引用
+            let ref = node.popperRef();
+            
+            // 创建新的 Tippy 实例
+            let dummyDom = document.createElement('div');
+            
+            tip = tippy(dummyDom, {
+                getReferenceClientRect: ref.getBoundingClientRect,
+                trigger: 'manual', // 手动控制显示
+                content: `<div class="code-container">${codeHtml}</div>`,
+                allowHTML: true,
+                placement: 'right-start', // 显示在节点右侧
+                interactive: true, // 允许鼠标进入 Tooltip (以便复制文字)
+                appendTo: document.body,
+                theme: 'light' // 样式主题
+            });
+
+            tip.show();
+        });
+
+        // 鼠标移出事件
+        cy.on('mouseout', 'node', function(event) {
+            if (tip) {
+                tip.destroy(); // 销毁实例
+                tip = null;
+            }
+        });
+        
+        // 拖动节点时更新位置 (可选)
+        cy.on('position', 'node', function(event) {
+            if (tip) {
+                 tip.destroy();
+            }
+        });
+    </script>
+</body>
+</html>
